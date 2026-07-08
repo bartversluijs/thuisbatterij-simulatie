@@ -192,11 +192,40 @@ verstopt in de round-trip efficiëntie.
   schatting (`≈ kWh/jaar`) op basis van de werkelijke datalengte. De tegel is
   verborgen zolang het veld op 0 staat.
 
+**Rendement splitsen: batterij × omvormer** — *Fase 2*
+
+De twee efficiëntievelden (laden/ontladen) bundelen normaal twee fysiek
+verschillende verliezen: cel-/DC-DC-verlies in de **batterij** en AC↔DC-conversie
+in de **omvormer**. In "Geavanceerd (verliezen)" kun je die twee stadia apart
+opgeven, zodat ze onafhankelijk kunnen bewegen (bv. bij het vergelijken van
+omvormers of LV/HV-systemen).
+
+- **Modus (schakelaar):**
+  - *Gecombineerd* (standaard): je vult de twee bestaande velden
+    Laad-/Ontlaadefficiëntie in — identiek aan het gedrag vóór Fase 2.
+  - *Gesplitst* (vinkje "Rendement splitsen"): je vult vier velden in en het
+    effectieve rendement per richting is het product van beide stadia:
+    - `chargeEfficiency    = batterij_laden × omvormer_laden`
+    - `dischargeEfficiency = batterij_ontladen × omvormer_ontladen`
+- **Eenheid:** procenten (%) per stadium, per richting.
+- **Standaard:** vinkje uit → de twee gecombineerde velden gelden ongewijzigd
+  (bestaande configuraties en gedeelde URLs blijven identiek). Bij aanzetten:
+  ~98% batterij en ~97% omvormer per richting (round-trip ≈ 91%).
+- **Effect op het model:** puur op configuratie-niveau. De verliesketen
+  (net/PV → omvormer → batterij → omvormer → verbruik) wordt teruggebracht tot
+  dezelfde twee gecombineerde getallen die de simulator al gebruikt; Battery,
+  simulatoren en optimizers blijven ongewijzigd.
+- **Beschikbaar op:** arbitrage (index.html), PV + verbruik (with_solar.html) en
+  Eigen Data (custom_data.html) — de pagina's met handmatige efficiëntie-invoer.
+  De geavanceerde analyse (advanced.html) gebruikt vermogensafhankelijke curves
+  en heeft deze splitsing niet.
+
 Zie `PLAN.md` voor de bredere roadmap van modelleringsverbeteringen.
 
 ### Implementatie Status
 
 - [x] Vast verbruik omvormer / parasitair verlies (Fase 1, alle pagina's)
+- [x] Rendement splitsen in batterij × omvormer (Fase 2, handmatige-invoer pagina's)
 - [x] MILP solver (HiGHS via WebAssembly)
 - [x] PV productie integratie (0-10 kWp profielen)
 - [x] Eigen verbruik profielen (basis, WP, EV, WP+EV)

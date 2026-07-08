@@ -25,6 +25,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const form = document.getElementById('customDataForm');
     form.addEventListener('submit', handleFormSubmit);
 
+    // Phase 2: staged-efficiency toggle (show/hide the four stage fields).
+    initEfficiencyStagedToggle();
+
     // Show/hide custom formula inputs
     const priceRadios = document.querySelectorAll('input[name="priceMode"]');
     const customInputs = document.getElementById('customFormulaInputs');
@@ -224,8 +227,15 @@ async function handleFormSubmit(e) {
     const initialSoc = parseFloat(formData.get('initialSoc'));
     const chargePower = parseFloat(formData.get('chargePower'));
     const dischargePower = parseFloat(formData.get('dischargePower'));
-    const chargeEff = parseFloat(formData.get('chargeEff')) / 100;
-    const dischargeEff = parseFloat(formData.get('dischargeEff')) / 100;
+    // Phase 2: staged mode → effective efficiency = battery × inverter per direction
+    // (combined mode returns these two values unchanged). Resolved here so every
+    // downstream config (main run below) uses the effective efficiencies.
+    const _eff = readStagedEfficiency(
+        parseFloat(formData.get('chargeEff')) / 100,
+        parseFloat(formData.get('dischargeEff')) / 100
+    );
+    const chargeEff = _eff.chargeEfficiency;
+    const dischargeEff = _eff.dischargeEfficiency;
     const minSoc = parseFloat(formData.get('minSoc'));
     const maxSoc = parseFloat(formData.get('maxSoc'));
     const fixedConsumptionW = parseFloat(formData.get('fixedConsumption')) || 0;  // Watts, Phase 1 (default 0 = no-op)
@@ -382,8 +392,14 @@ async function handleCapacityScan(form, formData) {
     progressContainer.style.display = 'block';
 
     // Common battery parameters
-    const chargeEff = parseFloat(formData.get('chargeEff')) / 100;
-    const dischargeEff = parseFloat(formData.get('dischargeEff')) / 100;
+    // Phase 2: resolve staged (battery × inverter) or combined efficiency once,
+    // applied to the baseline and every capacity in the scan below.
+    const _eff = readStagedEfficiency(
+        parseFloat(formData.get('chargeEff')) / 100,
+        parseFloat(formData.get('dischargeEff')) / 100
+    );
+    const chargeEff = _eff.chargeEfficiency;
+    const dischargeEff = _eff.dischargeEfficiency;
     const initialSoc = parseFloat(formData.get('initialSoc'));
     const minSoc = parseFloat(formData.get('minSoc'));
     const maxSoc = parseFloat(formData.get('maxSoc'));

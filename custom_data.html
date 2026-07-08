@@ -112,6 +112,36 @@
                             of kWh/dag × 1000 / 24 = W). Standaard 0 = geen effect. Wordt onttrokken aan
                             de batterij zolang SoC boven Min SoC ligt, anders van het net.
                         </small>
+
+                        <hr style="margin: 0.9rem 0; border: none; border-top: 1px solid var(--border-color, #ddd);">
+                        <div class="form-group-inline">
+                            <label for="efficiencyStaged" style="cursor: pointer;">Rendement splitsen (batterij × omvormer):</label>
+                            <input type="checkbox" id="efficiencyStaged">
+                        </div>
+                        <div id="stagedEffFields" style="display: none; margin-top: 0.5rem;">
+                            <div class="form-group-inline">
+                                <label for="batteryChargeEff">Batterij laden (%):</label>
+                                <input type="number" id="batteryChargeEff" name="batteryChargeEff" min="50" max="100" step="0.1" value="98">
+                            </div>
+                            <div class="form-group-inline">
+                                <label for="batteryDischargeEff">Batterij ontladen (%):</label>
+                                <input type="number" id="batteryDischargeEff" name="batteryDischargeEff" min="50" max="100" step="0.1" value="98">
+                            </div>
+                            <div class="form-group-inline">
+                                <label for="inverterChargeEff">Omvormer laden (%):</label>
+                                <input type="number" id="inverterChargeEff" name="inverterChargeEff" min="50" max="100" step="0.1" value="97">
+                            </div>
+                            <div class="form-group-inline">
+                                <label for="inverterDischargeEff">Omvormer ontladen (%):</label>
+                                <input type="number" id="inverterDischargeEff" name="inverterDischargeEff" min="50" max="100" step="0.1" value="97">
+                            </div>
+                        </div>
+                        <small style="display: block; color: var(--text-secondary);">
+                            Aan: batterij (DC-DC/cel + BMS) en omvormer (AC↔DC) apart gemodelleerd;
+                            effectief rendement per richting = batterij × omvormer. De velden Laad-/Ontlaadefficiëntie
+                            hierboven worden dan genegeerd. Uit: die twee velden gelden ongewijzigd.
+                            Richtwaarde ~98% batterij en ~97% omvormer per richting.
+                        </small>
                     </details>
                 </div>
 
@@ -406,6 +436,7 @@
     <script src="js/lib/highs.js"></script>
 
     <script src="js/battery.js"></script>
+    <script src="js/efficiency_stages.js"></script>
     <script src="js/optimizer.js"></script>
     <script src="js/p1_parser.js"></script>
     <script src="js/custom_data_simulator.js"></script>
