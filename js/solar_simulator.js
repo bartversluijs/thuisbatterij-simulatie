@@ -3,6 +3,19 @@
  * Compares scenarios: no battery, with battery, and fixed contract
  */
 
+/**
+ * Resolve the Phase-5 ThroughputTracker (browser global or Node require).
+ * Optional: absent → metrics not collected, run otherwise unchanged.
+ * @returns {Function|null}
+ */
+function _resolveThroughputTracker() {
+    if (typeof ThroughputTracker !== 'undefined') return ThroughputTracker; // browser global
+    if (typeof require !== 'undefined') {
+        try { return require('./throughput_metrics.js').ThroughputTracker; } catch (e) { /* optional */ }
+    }
+    return null;
+}
+
 class SolarSimulator {
     /**
      * @param {Object} batteryConfig - Battery configuration
@@ -157,6 +170,14 @@ class SolarSimulator {
         let totalBatteryDischarge = 0;
         let totalFixedConsumption = 0;  // kWh inverter standby draw (Phase 1)
 
+        // Phase 5: DC throughput metrics (effective capacity already resolved).
+        const TrackerCls = _resolveThroughputTracker();
+        const throughput = TrackerCls ? new TrackerCls({
+            capacityKwh: this.batteryConfig.capacityKwh,
+            chargePowerKw: this.batteryConfig.chargePowerKw,
+            dischargePowerKw: this.batteryConfig.dischargePowerKw,
+        }) : null;
+
         const mergedData = this.mergeData();
         let currentPlan = null;
         let needsInitialPlan = true;
@@ -230,6 +251,8 @@ class SolarSimulator {
             // Execute battery plan if we have one
             let batteryAction = 'idle';
             let batteryEnergyKwh = 0;
+            let dcCharge = 0;     // DC into battery this step (Phase 5)
+            let dcDischarge = 0;  // DC out of battery this step (Phase 5)
             const currentTs = currentTime.getTime();
 
             if (currentPlan && currentPlan.has(currentTs)) {
@@ -237,6 +260,7 @@ class SolarSimulator {
 
                 if (plannedAction.action === 'charge') {
                     const [dcToBattery, acFromGrid] = battery.charge(plannedAction.energyKwh, 1.0);
+                    dcCharge = dcToBattery;
                     if (dcToBattery > 0.001) {
                         batteryAction = 'charge';
                         batteryEnergyKwh = acFromGrid;
@@ -244,12 +268,17 @@ class SolarSimulator {
                     }
                 } else if (plannedAction.action === 'discharge') {
                     const [dcFromBattery, acToGrid] = battery.discharge(plannedAction.energyKwh, 1.0);
+                    dcDischarge = dcFromBattery;
                     if (dcFromBattery > 0.001) {
                         batteryAction = 'discharge';
                         batteryEnergyKwh = acToGrid;
                         totalBatteryDischarge += dcFromBattery;
                     }
                 }
+            }
+
+            if (throughput) {
+                throughput.record(currentTs, dcCharge, dcDischarge, 1.0);
             }
 
             // Energy flow accounting with correct prioritization
@@ -363,6 +392,7 @@ class SolarSimulator {
             totalBatteryDischarge: totalBatteryDischarge,
             totalFixedConsumption: totalFixedConsumption,
             cycles: cycles,
+            throughput: throughput ? throughput.metrics() : null,  // Phase 5
             selfConsumptionPct: selfConsumptionPct,
             selfSufficiencyPct: selfSufficiencyPct
         };
@@ -464,6 +494,14 @@ class SolarSimulator {
         let totalBatteryDischarge = 0;
         let totalFixedConsumption = 0;  // kWh inverter standby draw (Phase 1)
 
+        // Phase 5: DC throughput metrics (effective capacity already resolved).
+        const TrackerCls = _resolveThroughputTracker();
+        const throughput = TrackerCls ? new TrackerCls({
+            capacityKwh: this.batteryConfig.capacityKwh,
+            chargePowerKw: this.batteryConfig.chargePowerKw,
+            dischargePowerKw: this.batteryConfig.dischargePowerKw,
+        }) : null;
+
         const mergedData = this.mergeData();
 
         for (const entry of mergedData) {
@@ -485,8 +523,11 @@ class SolarSimulator {
             // Try to charge battery from excess solar
             let solarToBattery = 0;
             let batteryAction = 'idle';
+            let dcCharge = 0;     // DC into battery this step (Phase 5)
+            let dcDischarge = 0;  // DC out of battery this step (Phase 5)
             if (remainingSolar > 0) {
                 const [dcCharged, acUsed] = battery.charge(remainingSolar, 1.0);
+                dcCharge = dcCharged;
                 if (dcCharged > 0.001) {
                     solarToBattery = acUsed;
                     remainingSolar -= acUsed;
@@ -499,12 +540,17 @@ class SolarSimulator {
             let batteryToConsumption = 0;
             if (remainingConsumption > 0) {
                 const [dcDischarged, acProvided] = battery.discharge(remainingConsumption, 1.0);
+                dcDischarge = dcDischarged;
                 if (dcDischarged > 0.001) {
                     batteryToConsumption = acProvided;
                     remainingConsumption -= acProvided;
                     batteryAction = 'discharge';
                     totalBatteryDischarge += dcDischarged;
                 }
+            }
+
+            if (throughput) {
+                throughput.record(entry.timestamp.getTime(), dcCharge, dcDischarge, 1.0);
             }
 
             // Grid import/export for what remains
@@ -584,6 +630,7 @@ class SolarSimulator {
             totalBatteryDischarge: totalBatteryDischarge,
             totalFixedConsumption: totalFixedConsumption,
             cycles: cycles,
+            throughput: throughput ? throughput.metrics() : null,  // Phase 5
             selfConsumptionPct: selfConsumptionPct,
             selfSufficiencyPct: selfSufficiencyPct
         };

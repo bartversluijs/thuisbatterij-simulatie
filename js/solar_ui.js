@@ -411,6 +411,31 @@ function displayResults(results, year, simulator) {
         }
     }
 
+    // Throughput & equivalent full cycles (Phase 5) — from the with-battery run.
+    const tp = withBattery.throughput;
+    const efcCard = document.getElementById('efcCard');
+    if (efcCard) {
+        if (tp && tp.equivalentFullCycles > 0) {
+            document.getElementById('efcValue').textContent = tp.equivalentFullCycles.toFixed(0);
+            document.getElementById('efcThroughput').textContent =
+                `≈ ${tp.annualThroughputKwh.toFixed(0)} kWh doorzet/jaar`;
+            efcCard.style.display = '';
+        } else {
+            efcCard.style.display = 'none';
+        }
+    }
+    const clipCard = document.getElementById('clipCard');
+    if (clipCard) {
+        if (tp && tp.clippedSteps > 0) {
+            document.getElementById('clipValue').textContent = `${tp.clippedPct.toFixed(1)}%`;
+            const peak = Math.max(tp.peakChargeKw, tp.peakDischargeKw);
+            document.getElementById('clipPeak').textContent = `van de stappen · piek ${peak.toFixed(1)} kW`;
+            clipCard.style.display = '';
+        } else {
+            clipCard.style.display = 'none';
+        }
+    }
+
     // Populate grid import/export statistics (with battery as main value, without battery for comparison)
     document.getElementById('gridImport').textContent = withBattery.totalGridImport.toFixed(0) + ' kWh';
     document.getElementById('gridImportComparison').textContent = `zonder bat: ${noBattery.totalGridImport.toFixed(0)} kWh`;

@@ -2,6 +2,19 @@
  * Custom Data Simulator - Simulate battery optimization with user-uploaded P1 data
  */
 
+/**
+ * Resolve the Phase-5 ThroughputTracker (browser global or Node require).
+ * Optional: absent → metrics not collected, run otherwise unchanged.
+ * @returns {Function|null}
+ */
+function _resolveThroughputTracker() {
+    if (typeof ThroughputTracker !== 'undefined') return ThroughputTracker; // browser global
+    if (typeof require !== 'undefined') {
+        try { return require('./throughput_metrics.js').ThroughputTracker; } catch (e) { /* optional */ }
+    }
+    return null;
+}
+
 class CustomDataSimulator {
     constructor(batteryConfig, priceConfig, fixedPriceConfig, gridFlowData, pricesData, dataInterval = 60) {
         this.batteryConfig = batteryConfig;
@@ -122,6 +135,15 @@ class CustomDataSimulator {
         let totalDischarged = 0;
         let totalFixedConsumption = 0;
 
+        // Phase 5: DC throughput metrics. capacityKwh is the effective (post-
+        // degradation) capacity already resolved by the caller.
+        const TrackerCls = _resolveThroughputTracker();
+        const throughput = TrackerCls ? new TrackerCls({
+            capacityKwh: this.batteryConfig.capacityKwh,
+            chargePowerKw: this.batteryConfig.chargePowerKw,
+            dischargePowerKw: this.batteryConfig.dischargePowerKw,
+        }) : null;
+
         const hourlyResults = [];
 
         for (let i = 0; i < this.gridFlowData.length; i++) {
@@ -135,11 +157,14 @@ class CustomDataSimulator {
             // - When importing (positive netGridFlow): discharge battery
             let actualCharge = 0;
             let actualDischarge = 0;
+            let dcCharge = 0;     // DC into battery this step (Phase 5)
+            let dcDischarge = 0;  // DC out of battery this step (Phase 5)
 
             if (flow.netGridFlow < 0) {
                 // Surplus (export): try to charge battery
                 const availableSurplus = -flow.netGridFlow;
                 const [dcToBattery, acFromGrid] = battery.charge(availableSurplus, this.durationHours);
+                dcCharge = dcToBattery;
                 if (dcToBattery > 0.001) {
                     actualCharge = acFromGrid;
                     totalCharged += dcToBattery;
@@ -148,10 +173,15 @@ class CustomDataSimulator {
                 // Deficit (import): try to discharge battery
                 const neededPower = flow.netGridFlow;
                 const [dcFromBattery, acToGrid] = battery.discharge(neededPower, this.durationHours);
+                dcDischarge = dcFromBattery;
                 if (dcFromBattery > 0.001) {
                     actualDischarge = acToGrid;
                     totalDischarged += dcFromBattery;
                 }
+            }
+
+            if (throughput) {
+                throughput.record(new Date(flow.timestamp).getTime(), dcCharge, dcDischarge, this.durationHours);
             }
 
             // Calculate net grid flow after battery
@@ -213,6 +243,7 @@ class CustomDataSimulator {
             totalDischarged,
             totalFixedConsumption,
             cycles,
+            throughput: throughput ? throughput.metrics() : null,  // Phase 5
             hourlyResults
         };
     }
@@ -297,6 +328,14 @@ class CustomDataSimulator {
         let totalDischarged = 0;
         let totalFixedConsumption = 0;
 
+        // Phase 5: DC throughput metrics (effective capacity already resolved).
+        const TrackerCls = _resolveThroughputTracker();
+        const throughput = TrackerCls ? new TrackerCls({
+            capacityKwh: this.batteryConfig.capacityKwh,
+            chargePowerKw: this.batteryConfig.chargePowerKw,
+            dischargePowerKw: this.batteryConfig.dischargePowerKw,
+        }) : null;
+
         const hourlyResults = [];
         let currentHour = 0;
 
@@ -376,6 +415,8 @@ class CustomDataSimulator {
                 // Execute battery plan if we have one
                 let actualCharge = 0;
                 let actualDischarge = 0;
+                let dcCharge = 0;     // DC into battery this step (Phase 5)
+                let dcDischarge = 0;  // DC out of battery this step (Phase 5)
                 const currentTs = new Date(flow.timestamp).getTime();
 
                 if (currentPlan && currentPlan.has(currentTs)) {
@@ -383,17 +424,23 @@ class CustomDataSimulator {
 
                     if (plannedAction.action === 'charge') {
                         const [dcToBattery, acFromGrid] = battery.charge(plannedAction.energyKwh, this.durationHours);
+                        dcCharge = dcToBattery;
                         if (dcToBattery > 0.001) {
                             actualCharge = acFromGrid;
                             totalCharged += dcToBattery;
                         }
                     } else if (plannedAction.action === 'discharge') {
                         const [dcFromBattery, acToGrid] = battery.discharge(plannedAction.energyKwh, this.durationHours);
+                        dcDischarge = dcFromBattery;
                         if (dcFromBattery > 0.001) {
                             actualDischarge = acToGrid;
                             totalDischarged += dcFromBattery;
                         }
                     }
+                }
+
+                if (throughput) {
+                    throughput.record(currentTs, dcCharge, dcDischarge, this.durationHours);
                 }
 
                 // Calculate net grid flow after battery
@@ -464,6 +511,7 @@ class CustomDataSimulator {
             totalDischarged,
             totalFixedConsumption,
             cycles,
+            throughput: throughput ? throughput.metrics() : null,  // Phase 5
             hourlyResults
         };
     }

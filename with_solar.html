@@ -367,6 +367,16 @@
                     <p class="total-value" id="standbyConsumption" style="font-size: 1.2rem;">0 kWh</p>
                     <small style="color: var(--text-secondary); font-size: 0.75rem;" id="standbyConsumptionComparison">≈ 0 kWh/jaar</small>
                 </div>
+                <div class="total-card" id="efcCard" style="display: none;">
+                    <h3>Volledige cycli per jaar</h3>
+                    <p class="total-value" id="efcValue" style="font-size: 1.2rem;">0</p>
+                    <small style="color: var(--text-secondary); font-size: 0.75rem;" id="efcThroughput">≈ 0 kWh doorzet/jaar</small>
+                </div>
+                <div class="total-card" id="clipCard" style="display: none;">
+                    <h3>Vermogen begrensd</h3>
+                    <p class="total-value" id="clipValue" style="font-size: 1.2rem;">0%</p>
+                    <small style="color: var(--text-secondary); font-size: 0.75rem;" id="clipPeak">van de stappen</small>
+                </div>
             </div>
 
             <div class="table-container">
@@ -521,6 +531,7 @@
     <script src="js/battery.js"></script>
     <script src="js/efficiency_stages.js"></script>
     <script src="js/capacity_degradation.js"></script>
+    <script src="js/throughput_metrics.js"></script>
     <script src="js/optimizer.js"></script>
     <script src="js/solar_simulator.js"></script>
     <script src="js/solar_ui.js"></script>

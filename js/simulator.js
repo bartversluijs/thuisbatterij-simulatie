@@ -1,4 +1,18 @@
 /**
+ * Resolve the Phase-5 ThroughputTracker, whether running in the browser (loaded
+ * as a global before this script) or in Node (required). Optional: if absent,
+ * throughput metrics are simply not collected and the run is otherwise unchanged.
+ * @returns {Function|null}
+ */
+function _resolveThroughputTracker() {
+    if (typeof ThroughputTracker !== 'undefined') return ThroughputTracker; // browser global
+    if (typeof require !== 'undefined') {
+        try { return require('./throughput_metrics.js').ThroughputTracker; } catch (e) { /* optional */ }
+    }
+    return null;
+}
+
+/**
  * Battery Simulator - main simulation engine
  * Simulates battery trading on EPEX market with day-ahead optimization
  */
@@ -28,6 +42,15 @@ class BatterySimulator {
         this.history = [];
         this.currentPlan = null;
         this.totalFixedConsumption = 0;  // kWh of inverter standby draw over the run (Phase 1)
+
+        // Phase 5: accumulate DC throughput per timestep for the output metrics.
+        // capacityKwh here is already the effective (post-degradation) capacity.
+        const TrackerCls = _resolveThroughputTracker();
+        this.throughput = TrackerCls ? new TrackerCls({
+            capacityKwh: this.batteryConfig.capacityKwh,
+            chargePowerKw: this.batteryConfig.chargePowerKw,
+            dischargePowerKw: this.batteryConfig.dischargePowerKw,
+        }) : null;
 
         // Convert prices to Map for fast lookup (index-based to handle DST duplicates)
         const pricesMap = new Map();
@@ -154,6 +177,8 @@ class BatterySimulator {
             let action = 'idle';
             let energyKwh = 0;
             let profit = 0;
+            let dcCharge = 0;     // DC energy into the battery this step (Phase 5)
+            let dcDischarge = 0;  // DC energy out of the battery this step (Phase 5)
 
             if (this.currentPlan && this.currentPlan.has(currentTs)) {
                 const plannedAction = this.currentPlan.get(currentTs);
@@ -165,6 +190,7 @@ class BatterySimulator {
                     );
                     energyKwh = acFromGrid;
                     profit = -acFromGrid * buyPrice;
+                    dcCharge = dcToBattery;
                     if (dcToBattery > 0.001) {
                         action = 'charge';
                     }
@@ -175,10 +201,16 @@ class BatterySimulator {
                     );
                     energyKwh = acToGrid;
                     profit = acToGrid * sellPrice;
+                    dcDischarge = dcFromBattery;
                     if (dcFromBattery > 0.001) {
                         action = 'discharge';
                     }
                 }
+            }
+
+            // Phase 5: record DC throughput for this timestep.
+            if (this.throughput) {
+                this.throughput.record(currentTs, dcCharge, dcDischarge, durationHours);
             }
 
             // Fixed inverter/system parasitic consumption (Phase 1): a continuous
@@ -298,6 +330,15 @@ class BatterySimulator {
             totalCycles,
             avgProfitPerCycle
         };
+    }
+
+    /**
+     * Phase 5: throughput & equivalent-full-cycle metrics for the last run.
+     * Returns null if the tracker was unavailable (module not loaded).
+     * @returns {Object|null}
+     */
+    getThroughputMetrics() {
+        return this.throughput ? this.throughput.metrics() : null;
     }
 
     /**

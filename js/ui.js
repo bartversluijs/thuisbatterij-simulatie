@@ -213,6 +213,9 @@ async function handleFormSubmit(event) {
             totals.fixedConsumptionYears = spanMs / (365.25 * 24 * 3600 * 1000);
         }
 
+        // Throughput & equivalent full cycles (Phase 5)
+        totals.throughput = simulator.getThroughputMetrics();
+
         // Store results
         currentResults = results;
         currentMonthlySummary = monthlySummary;
@@ -300,6 +303,10 @@ function displayResults(totals, monthlySummary) {
         }
     }
 
+    // Throughput & equivalent full cycles (Phase 5) — validates the efficiency
+    // assumptions and flags when the power rating is the binding constraint.
+    displayThroughput(totals.throughput);
+
     // Update table
     const tableBody = document.getElementById('monthlyTableBody');
     tableBody.innerHTML = '';
@@ -327,6 +334,40 @@ function displayResults(totals, monthlySummary) {
 
     // Scroll to results
     document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+}
+
+/**
+ * Render the Phase-5 throughput / equivalent-full-cycle output cards.
+ * Cards stay hidden until there is real throughput to show, so the summary
+ * is unchanged for runs where the battery never cycles.
+ * @param {Object|null} m - Metrics from BatterySimulator.getThroughputMetrics().
+ */
+function displayThroughput(m) {
+    const efcCard = document.getElementById('efcCard');
+    const clipCard = document.getElementById('clipCard');
+
+    if (efcCard) {
+        if (m && m.equivalentFullCycles > 0) {
+            document.getElementById('efcValue').textContent = m.equivalentFullCycles.toFixed(0);
+            document.getElementById('efcThroughput').textContent =
+                `≈ ${m.annualThroughputKwh.toFixed(0)} kWh doorzet/jaar`;
+            efcCard.style.display = '';
+        } else {
+            efcCard.style.display = 'none';
+        }
+    }
+
+    if (clipCard) {
+        if (m && m.clippedSteps > 0) {
+            document.getElementById('clipValue').textContent = `${m.clippedPct.toFixed(1)}%`;
+            const peak = Math.max(m.peakChargeKw, m.peakDischargeKw);
+            document.getElementById('clipPeak').textContent =
+                `van de stappen · piek ${peak.toFixed(1)} kW`;
+            clipCard.style.display = '';
+        } else {
+            clipCard.style.display = 'none';
+        }
+    }
 }
 
 /**

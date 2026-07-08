@@ -283,6 +283,33 @@ levensduur.
 - **Beschikbaar op:** arbitrage (index.html), PV + verbruik (with_solar.html) en
   Eigen Data (custom_data.html), inclusief de vermogensscan op de Eigen Data-pagina.
 
+**Doorzet & volledige cycli (equivalent full cycles)** — *Fase 5*
+
+Dit is een **uitvoer**, geen invoer: het rekent niets aan de fysica, maar meet de
+energie die daadwerkelijk door de batterij is gegaan. Zo kun je elke
+rendements- en capaciteitsaanname *valideren* tegen het resultaat, en het voedt
+de per-cyclus degradatie van Fase 4.
+
+- **Getoonde waarden (naast de financiële resultaten):**
+  - *Volledige cycli per jaar* — jaarlijkse ontladen doorzet ÷ bruikbare
+    capaciteit (equivalent full cycles, EFC). De doorzet wordt op de **DC-zijde**
+    (aan de batterij) gemeten, consistent met de bruikbare capaciteit, zodat een
+    EFC fysiek betekenis heeft. Gebruikt de *effectieve* (na-degradatie)
+    capaciteit uit Fase 4 als noemer.
+  - *Jaarlijkse doorzet (kWh)* — geleverde (ontladen) energie per jaar.
+  - *Vermogen begrensd* — percentage tijdstappen waarin het geleverde vermogen
+    tegen de DC-vermogenslimiet aanliep, plus het waargenomen piekvermogen.
+    Veel begrenzing betekent dat het **vermogen** (kW) de beperkende factor is,
+    niet de capaciteit (kWh) — nuttig bij het dimensioneren.
+- **Normalisatie per jaar:** cijfers worden geschaald naar de **werkelijke
+  tijdspanne van de dataset** (afgeleid uit de tijdstempels; een jaar = 8760 h),
+  zodat een dataset die geen heel aantal jaren beslaat correct wordt
+  geëxtrapoleerd. Overgeslagen NULL-rijen tellen niet mee.
+- **Standaard:** puur additief; de kaarten verschijnen alleen als de batterij
+  daadwerkelijk cyclet. Runs zonder batterijactiviteit blijven ongewijzigd.
+- **Beschikbaar op:** arbitrage (index.html), PV + verbruik (with_solar.html) en
+  Eigen Data (custom_data.html).
+
 Zie `PLAN.md` voor de bredere roadmap van modelleringsverbeteringen.
 
 ### Implementatie Status
@@ -291,6 +318,7 @@ Zie `PLAN.md` voor de bredere roadmap van modelleringsverbeteringen.
 - [x] Rendement splitsen in batterij × omvormer (Fase 2, handmatige-invoer pagina's)
 - [x] Deellast-rendement omvormer (Fase 3, handmatige-invoer pagina's)
 - [x] Capaciteitsdegradatie over levensduur (Fase 4, handmatige-invoer pagina's)
+- [x] Doorzet & volledige cycli (EFC) als uitvoer (Fase 5, alle pagina's)
 - [x] MILP solver (HiGHS via WebAssembly)
 - [x] PV productie integratie (0-10 kWp profielen)
 - [x] Eigen verbruik profielen (basis, WP, EV, WP+EV)
