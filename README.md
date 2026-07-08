@@ -250,6 +250,39 @@ werkelijke opbrengst bij laag-vermogen laden/ontladen systematisch.
   Eigen Data (custom_data.html). De geavanceerde analyse (advanced.html) gebruikt
   al vermogensafhankelijke curves (Victron) en heeft deze optie niet nodig.
 
+**Capaciteitsdegradatie over de levensduur** — *Fase 4*
+
+Terugverdientijd wordt over 10–15 jaar bekeken, maar de bruikbare capaciteit is
+niet constant: een LFP-pakket zakt richting de einde-levensduurgrens (vaak
+~70–80% van nominaal na de gegarandeerde cycli). Dit negeren *overschat* de
+besparing in de latere jaren.
+
+Omdat de simulatie één jaar data doorrekent, kan één run niet de hele levensduur
+beslaan. Daarom gebruikt de simulatie de **gemiddelde bruikbare capaciteit over
+de analysehorizon** — een representatief getal voor een typisch jaar uit die
+levensduur. Bij lineaire afname is dat gelijk aan de capaciteit halverwege de
+levensduur.
+
+- **Velden ("Geavanceerd (verliezen)", keuzelijst "Capaciteitsdegradatie"):**
+  - *Geen* (standaard) — geen effect.
+  - *Per jaar*: `degradation_rate` in **%/jaar** (bijv. 2%/jaar).
+  - *Per cyclus*: `degradation_rate` in **%/cyclus** plus een schatting
+    *cycli per jaar* (één jaar data heeft nog geen eigen levensduur-cyclustelling;
+    de per-cyclus modus vermenigvuldigt de schatting × leeftijd tot cumulatieve
+    cycli). Een gemeten cycli/jaar kan later uit Fase 5 (doorzet/EFC) komen.
+  - `end_of_life_floor` — *Ondergrens einde levensduur (%)*: capaciteit wordt hier
+    op geklemd (standaard 70%), degradeert nooit naar nul.
+  - `horizon_years` — *Analysehorizon (jaar)*: de periode waarover de gemiddelde
+    capaciteit wordt bepaald (standaard 15 jaar).
+- **Model:** afname is **lineair** en geklemd op de ondergrens; de effectieve
+  capaciteit = nominaal × gemiddelde capaciteitsfractie over de horizon. Alleen de
+  bruikbare capaciteit verandert; de fysica per tijdstap blijft ongewijzigd. Een
+  live hint toont de gemiddelde en einde-horizon capaciteit ter controle.
+- **Standaard:** *Geen* → geen effect; bestaande configuraties en gedeelde URLs
+  blijven identiek.
+- **Beschikbaar op:** arbitrage (index.html), PV + verbruik (with_solar.html) en
+  Eigen Data (custom_data.html), inclusief de vermogensscan op de Eigen Data-pagina.
+
 Zie `PLAN.md` voor de bredere roadmap van modelleringsverbeteringen.
 
 ### Implementatie Status
@@ -257,6 +290,7 @@ Zie `PLAN.md` voor de bredere roadmap van modelleringsverbeteringen.
 - [x] Vast verbruik omvormer / parasitair verlies (Fase 1, alle pagina's)
 - [x] Rendement splitsen in batterij × omvormer (Fase 2, handmatige-invoer pagina's)
 - [x] Deellast-rendement omvormer (Fase 3, handmatige-invoer pagina's)
+- [x] Capaciteitsdegradatie over levensduur (Fase 4, handmatige-invoer pagina's)
 - [x] MILP solver (HiGHS via WebAssembly)
 - [x] PV productie integratie (0-10 kWp profielen)
 - [x] Eigen verbruik profielen (basis, WP, EV, WP+EV)
@@ -272,7 +306,6 @@ Zie `PLAN.md` voor de bredere roadmap van modelleringsverbeteringen.
 - [ ] Meer jaren voor verbruik/PV data (nu alleen 2024)
 - [ ] Meer verbruiksprofielen (airco, zwembad, etc.)
 - [ ] Optimalisatie algoritme voor vermogensscan (gradient descent)
-- [ ] Batterij degradatie modellering
 
 ## Contact
 

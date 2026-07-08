@@ -25,6 +25,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Phase 3: show/hide the part-load efficiency fields when the toggle changes.
     initPartLoadToggle();
 
+    // Phase 4: show/hide degradation fields per mode and keep the live hint fresh.
+    initDegradationToggle();
+
     // Handle custom formula toggle
     const priceModeRadios = document.querySelectorAll('input[name="priceMode"]');
     priceModeRadios.forEach(radio => {
@@ -90,6 +93,11 @@ async function handleFormSubmit(event) {
     // Phase 3: part-load efficiency curve. Disabled → { enabled: false } (no-op).
     const partLoad = readPartLoadConfig();
 
+    // Phase 4: capacity degradation → representative usable capacity for this run.
+    // Mode 'none' returns the nominal capacity unchanged (backward compatible).
+    const degradation = readDegradationConfig();
+    const effectiveCapacity = effectiveCapacityKwh(capacity, degradation);
+
     const priceMode = document.querySelector('input[name="priceMode"]:checked').value;
 
     // Validate
@@ -108,7 +116,7 @@ async function handleFormSubmit(event) {
 
         // Create configurations
         const batteryConfig = {
-            capacityKwh: capacity,
+            capacityKwh: effectiveCapacity,
             chargePowerKw: chargePower,
             dischargePowerKw: dischargePower,
             chargeEfficiency: eff.chargeEfficiency,
@@ -573,6 +581,22 @@ function loadParametersFromUrl() {
         }
     }
 
+    // Capacity degradation (Phase 4) — restore mode + fields, then reveal them.
+    ['degradationRateYear', 'degradationRateCycle', 'degradationCyclesPerYear',
+        'degradationFloor', 'degradationHorizon'].forEach(field => {
+        if (params.has(field)) {
+            const el = document.getElementById(field);
+            if (el) el.value = params.get(field);
+        }
+    });
+    if (params.has('degradationMode')) {
+        const degEl = document.getElementById('degradationMode');
+        if (degEl) {
+            degEl.value = params.get('degradationMode');
+            degEl.dispatchEvent(new Event('change'));  // reveal fields per mode + refresh hint
+        }
+    }
+
     // Load price mode
     if (params.has('priceMode')) {
         const priceMode = params.get('priceMode');
@@ -635,6 +659,20 @@ function updateUrlWithParameters() {
         params.set('lowPowerThresholdKw', document.getElementById('lowPowerThresholdKw').value);
         const interpEl = document.getElementById('partLoadInterpolate');
         params.set('partLoadInterpolate', interpEl && interpEl.checked ? '1' : '0');
+    }
+
+    // Capacity degradation (Phase 4) — only persist when a mode is active.
+    const degEl = document.getElementById('degradationMode');
+    if (degEl && (degEl.value === 'per_year' || degEl.value === 'per_cycle')) {
+        params.set('degradationMode', degEl.value);
+        if (degEl.value === 'per_year') {
+            params.set('degradationRateYear', document.getElementById('degradationRateYear').value);
+        } else {
+            params.set('degradationRateCycle', document.getElementById('degradationRateCycle').value);
+            params.set('degradationCyclesPerYear', document.getElementById('degradationCyclesPerYear').value);
+        }
+        params.set('degradationFloor', document.getElementById('degradationFloor').value);
+        params.set('degradationHorizon', document.getElementById('degradationHorizon').value);
     }
 
     // Add price mode

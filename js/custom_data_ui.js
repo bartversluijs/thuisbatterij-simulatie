@@ -31,6 +31,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Phase 3: part-load efficiency toggle (show/hide the part-load fields).
     initPartLoadToggle();
 
+    // Phase 4: capacity degradation (show/hide fields per mode + live hint).
+    initDegradationToggle();
+
     // Show/hide custom formula inputs
     const priceRadios = document.querySelectorAll('input[name="priceMode"]');
     const customInputs = document.getElementById('customFormulaInputs');
@@ -244,6 +247,9 @@ async function handleFormSubmit(e) {
     const fixedConsumptionW = parseFloat(formData.get('fixedConsumption')) || 0;  // Watts, Phase 1 (default 0 = no-op)
     // Phase 3: part-load efficiency curve. Disabled → { enabled: false } (no-op).
     const partLoad = readPartLoadConfig();
+    // Phase 4: capacity degradation → representative usable capacity (none → unchanged).
+    const degradation = readDegradationConfig();
+    const effectiveCapacity = effectiveCapacityKwh(capacity, degradation);
     const priceMode = formData.get('priceMode');
 
     // Disable form
@@ -315,7 +321,7 @@ async function handleFormSubmit(e) {
 
         // Build configurations
         const batteryConfig = {
-            capacityKwh: capacity,
+            capacityKwh: effectiveCapacity,
             chargePowerKw: chargePower,
             dischargePowerKw: dischargePower,
             chargeEfficiency: chargeEff,
@@ -412,6 +418,8 @@ async function handleCapacityScan(form, formData) {
     const fixedConsumptionW = parseFloat(formData.get('fixedConsumption')) || 0;  // Watts, Phase 1
     // Phase 3: part-load efficiency curve, applied to the baseline and every capacity in the scan.
     const partLoad = readPartLoadConfig();
+    // Phase 4: capacity degradation, applied to every scanned (nominal) capacity below.
+    const degradation = readDegradationConfig();
     const priceMode = formData.get('priceMode');
 
     const capacities = [2, 4, 8, 16, 32, 64];
@@ -476,7 +484,7 @@ async function handleCapacityScan(form, formData) {
             await new Promise(resolve => setTimeout(resolve, 0));
 
             const batteryConfig = {
-                capacityKwh: cap,
+                capacityKwh: effectiveCapacityKwh(cap, degradation),
                 chargePowerKw: power,
                 dischargePowerKw: power,
                 chargeEfficiency: chargeEff,
