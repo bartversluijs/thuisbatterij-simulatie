@@ -9,12 +9,14 @@ class PowerSweepAnalysis {
      * @param {Object} priceConfig - Price configuration with buy/sell formulas
      * @param {Array<Object>} pricesData - Price data array
      * @param {Object} efficiencyCurve - Efficiency curve preset
+     * @param {number} [fixedConsumptionW] - Fixed inverter/system consumption in Watts (Phase 1). Default 0.
      */
-    constructor(capacityKwh, priceConfig, pricesData, efficiencyCurve) {
+    constructor(capacityKwh, priceConfig, pricesData, efficiencyCurve, fixedConsumptionW = 0) {
         this.capacityKwh = capacityKwh;
         this.priceConfig = priceConfig;
         this.pricesData = pricesData;
         this.efficiencyCurve = efficiencyCurve;
+        this.fixedConsumptionW = fixedConsumptionW || 0;
     }
 
     /**
@@ -71,7 +73,8 @@ class PowerSweepAnalysis {
                     chargeEfficiency: eff.chargeTotal,
                     dischargeEfficiency: eff.dischargeTotal,
                     minSocPct: minSocPct / 100,
-                    maxSocPct: maxSocPct / 100
+                    maxSocPct: maxSocPct / 100,
+                    fixedConsumptionW: this.fixedConsumptionW
                 };
 
                 // Run full year simulation

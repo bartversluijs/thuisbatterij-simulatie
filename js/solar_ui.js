@@ -92,6 +92,7 @@ async function handleFormSubmit(e) {
     const dischargeEff = parseFloat(formData.get('dischargeEff')) / 100;
     const minSoc = parseFloat(formData.get('minSoc'));
     const maxSoc = parseFloat(formData.get('maxSoc'));
+    const fixedConsumptionW = parseFloat(formData.get('fixedConsumption')) || 0;  // Watts, Phase 1
     const priceMode = formData.get('priceMode');
     const fixedBuyPrice = parseFloat(formData.get('fixedBuyPrice'));
     const fixedSellPrice = parseFloat(formData.get('fixedSellPrice'));
@@ -125,7 +126,8 @@ async function handleFormSubmit(e) {
             chargeEfficiency: chargeEff,
             dischargeEfficiency: dischargeEff,
             minSocPct: minSoc / 100,
-            maxSocPct: maxSoc / 100
+            maxSocPct: maxSoc / 100,
+            fixedConsumptionW: fixedConsumptionW
         };
 
         const priceConfig = buildPriceConfig(priceMode, formData);
@@ -371,6 +373,26 @@ function displayResults(results, year, simulator) {
     // Populate battery cycle statistics
     document.getElementById('totalCycles').textContent = withBattery.cycles.toFixed(1);
     document.getElementById('savingsPerCycle').textContent = '€' + (totalSavings / withBattery.cycles).toFixed(2);
+
+    // Standby (fixed inverter) consumption — only shown when the feature is enabled
+    const standbyCard = document.getElementById('standbyCard');
+    if (standbyCard) {
+        const standbyKwh = withBattery.totalFixedConsumption || 0;
+        if (standbyKwh > 0) {
+            document.getElementById('standbyConsumption').textContent = standbyKwh.toFixed(0) + ' kWh';
+            const hist = withBattery.history;
+            let perYearText = '';
+            if (hist && hist.length > 1) {
+                const spanMs = new Date(hist[hist.length - 1].timestamp) - new Date(hist[0].timestamp);
+                const years = spanMs / (365.25 * 24 * 3600 * 1000);
+                if (years > 0) perYearText = `≈ ${(standbyKwh / years).toFixed(0)} kWh/jaar`;
+            }
+            document.getElementById('standbyConsumptionComparison').textContent = perYearText;
+            standbyCard.style.display = '';
+        } else {
+            standbyCard.style.display = 'none';
+        }
+    }
 
     // Populate grid import/export statistics (with battery as main value, without battery for comparison)
     document.getElementById('gridImport').textContent = withBattery.totalGridImport.toFixed(0) + ' kWh';

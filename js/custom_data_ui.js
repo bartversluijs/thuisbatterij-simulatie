@@ -228,6 +228,7 @@ async function handleFormSubmit(e) {
     const dischargeEff = parseFloat(formData.get('dischargeEff')) / 100;
     const minSoc = parseFloat(formData.get('minSoc'));
     const maxSoc = parseFloat(formData.get('maxSoc'));
+    const fixedConsumptionW = parseFloat(formData.get('fixedConsumption')) || 0;  // Watts, Phase 1 (default 0 = no-op)
     const priceMode = formData.get('priceMode');
 
     // Disable form
@@ -306,7 +307,8 @@ async function handleFormSubmit(e) {
             dischargeEfficiency: dischargeEff,
             minSocPct: minSoc / 100,
             maxSocPct: maxSoc / 100,
-            initialSocPct: initialSoc / 100
+            initialSocPct: initialSoc / 100,
+            fixedConsumptionW: fixedConsumptionW
         };
 
         const priceConfig = buildPriceConfig(priceMode, formData);
@@ -385,6 +387,7 @@ async function handleCapacityScan(form, formData) {
     const initialSoc = parseFloat(formData.get('initialSoc'));
     const minSoc = parseFloat(formData.get('minSoc'));
     const maxSoc = parseFloat(formData.get('maxSoc'));
+    const fixedConsumptionW = parseFloat(formData.get('fixedConsumption')) || 0;  // Watts, Phase 1
     const priceMode = formData.get('priceMode');
 
     const capacities = [2, 4, 8, 16, 32, 64];
@@ -430,7 +433,8 @@ async function handleCapacityScan(form, formData) {
         const baselineSimulator = new CustomDataSimulator(
             { capacityKwh: 2, chargePowerKw: 0.5, dischargePowerKw: 0.5,
               chargeEfficiency: chargeEff, dischargeEfficiency: dischargeEff,
-              minSocPct: minSoc / 100, maxSocPct: maxSoc / 100, initialSocPct: initialSoc / 100 },
+              minSocPct: minSoc / 100, maxSocPct: maxSoc / 100, initialSocPct: initialSoc / 100,
+              fixedConsumptionW: fixedConsumptionW },
             priceConfig, fixedPriceConfig, trimmedData.data, pricesData, simulationInterval
         );
         const fixedNoBattery = await baselineSimulator.simulateFixedContract();
@@ -455,7 +459,8 @@ async function handleCapacityScan(form, formData) {
                 dischargeEfficiency: dischargeEff,
                 minSocPct: minSoc / 100,
                 maxSocPct: maxSoc / 100,
-                initialSocPct: initialSoc / 100
+                initialSocPct: initialSoc / 100,
+                fixedConsumptionW: fixedConsumptionW
             };
 
             const simulator = new CustomDataSimulator(
@@ -935,6 +940,28 @@ function displayResults(results, monthlySummaries) {
         `${priceStats.exportAtNegPriceWithBat.toFixed(0)} kWh / €${costWithBat.toFixed(2)}`;
     document.getElementById('exportAtNegPriceComparison').textContent =
         `zonder bat: ${priceStats.exportAtNegPriceNoBat.toFixed(0)} kWh / €${costNoBat.toFixed(2)}`;
+
+    // Standby (fixed inverter) consumption — only shown when the feature is enabled
+    const standbyKwh = dynWithBat.totalFixedConsumption || 0;
+    const standbyCard = document.getElementById('standbyCard');
+    if (standbyKwh > 0) {
+        document.getElementById('standbyConsumption').textContent = standbyKwh.toFixed(0) + ' kWh';
+
+        // Annualize based on the actual span of the simulated data
+        const hours = dynWithBat.hourlyResults;
+        let perYearText = '';
+        if (hours && hours.length > 1) {
+            const spanMs = new Date(hours[hours.length - 1].timestamp) - new Date(hours[0].timestamp);
+            const years = spanMs / (365.25 * 24 * 3600 * 1000);
+            if (years > 0) {
+                perYearText = `≈ ${(standbyKwh / years).toFixed(0)} kWh/jaar`;
+            }
+        }
+        document.getElementById('standbyConsumptionComparison').textContent = perYearText;
+        standbyCard.style.display = '';
+    } else {
+        standbyCard.style.display = 'none';
+    }
 
     // Fill savings detail table
     fillSavingsDetailTable(results);

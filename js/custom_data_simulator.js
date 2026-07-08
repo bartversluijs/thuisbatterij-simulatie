@@ -120,6 +120,7 @@ class CustomDataSimulator {
         let totalExport = 0;
         let totalCharged = 0;
         let totalDischarged = 0;
+        let totalFixedConsumption = 0;
 
         const hourlyResults = [];
 
@@ -155,7 +156,13 @@ class CustomDataSimulator {
 
             // Calculate net grid flow after battery
             const batteryContribution = actualDischarge - actualCharge;
-            const netFlowAfterBattery = flow.netGridFlow - batteryContribution;
+            let netFlowAfterBattery = flow.netGridFlow - batteryContribution;
+
+            // Fixed inverter/system parasitic consumption (Phase 1): drawn from the
+            // battery while SoC > Min SoC, the shortfall is supplied by the grid.
+            const fixed = battery.applyFixedConsumption(this.durationHours);
+            netFlowAfterBattery += fixed.fromGrid;
+            totalFixedConsumption += fixed.totalKwh;
 
             // Calculate grid import/export and costs
             let hourlyCost = 0;
@@ -204,6 +211,7 @@ class CustomDataSimulator {
             totalExport,
             totalCharged,
             totalDischarged,
+            totalFixedConsumption,
             cycles,
             hourlyResults
         };
@@ -287,6 +295,7 @@ class CustomDataSimulator {
         let totalExport = 0;
         let totalCharged = 0;
         let totalDischarged = 0;
+        let totalFixedConsumption = 0;
 
         const hourlyResults = [];
         let currentHour = 0;
@@ -391,7 +400,13 @@ class CustomDataSimulator {
                 // Positive net flow = import needed
                 // Negative net flow = export
                 const batteryContribution = actualDischarge - actualCharge;
-                const netFlowAfterBattery = flow.netGridFlow - batteryContribution;
+                let netFlowAfterBattery = flow.netGridFlow - batteryContribution;
+
+                // Fixed inverter/system parasitic consumption (Phase 1): drawn from
+                // the battery while SoC > Min SoC, the shortfall comes from the grid.
+                const fixed = battery.applyFixedConsumption(this.durationHours);
+                netFlowAfterBattery += fixed.fromGrid;
+                totalFixedConsumption += fixed.totalKwh;
 
                 // Calculate grid import/export and costs
                 let hourlyCost = 0;
@@ -447,6 +462,7 @@ class CustomDataSimulator {
             totalExport,
             totalCharged,
             totalDischarged,
+            totalFixedConsumption,
             cycles,
             hourlyResults
         };
@@ -610,4 +626,9 @@ class CustomDataSimulator {
 
         return timesteps.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     }
+}
+
+// Export for use in Node (tests). In the browser this is loaded as a global.
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = CustomDataSimulator;
 }

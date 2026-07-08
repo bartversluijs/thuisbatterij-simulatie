@@ -168,8 +168,35 @@ De simulator is gebaseerd op een niet-publieke Python implementatie en volledig 
 - Basis simulaties (index.html, with_solar.html): constante efficiency (instelbaar, standaard 89%, niet vermogensafhankelijk)
 - Geavanceerde analyse (advanced.html): vermogensafhankelijke efficiency curves (Victron MultiPlus 5000)
 
+### Modelleringsparameters
+
+**Vast verbruik omvormer (`fixed_consumption_w`, W)** — *Fase 1*
+
+Constant sluimer-/bedrijfsverbruik dat de omvormer trekt zodra hij aanstaat
+(~50–85 W voor een 3-fase hybride omvormer). Dit is een continue drain die
+**niet meeschaalt met doorzet** en daarom apart wordt gemodelleerd i.p.v.
+verstopt in de round-trip efficiëntie.
+
+- **Eenheid:** Watt (canonieke interne eenheid). Omrekenen: `kWh/dag = W × 24 / 1000`, dus `W = kWh/dag × 1000 / 24`.
+- **Standaard:** `0` W → geen effect (bestaande configuraties blijven identiek).
+- **Realistisch:** 50–85 W. Jaarverbruik ≈ `W × 8,76` kWh/jaar.
+- **Waar onttrokken (gedocumenteerde constante):** uit de batterij zolang SoC
+  boven Min SoC ligt; het tekort wordt door het net geleverd (verhoogt import /
+  verlaagt export tegen de inkoopprijs). Kan SoC nooit onder Min SoC trekken.
+- **Toepassing:** alleen in scenario's *mét* batterij (geen batterij = geen
+  omvormer = geen sluimerverbruik). Beschikbaar op alle pagina's onder
+  "Geavanceerd (verliezen)". De tijdstap `dt` wordt uit de data afgeleid, dus
+  ook kwartierdata (0,25 h) wordt correct verwerkt.
+- **Output ter validatie:** na de simulatie toont de resultatensectie het totale
+  sluimerverbruik in kWh over de gesimuleerde periode, met een geannualiseerde
+  schatting (`≈ kWh/jaar`) op basis van de werkelijke datalengte. De tegel is
+  verborgen zolang het veld op 0 staat.
+
+Zie `PLAN.md` voor de bredere roadmap van modelleringsverbeteringen.
+
 ### Implementatie Status
 
+- [x] Vast verbruik omvormer / parasitair verlies (Fase 1, alle pagina's)
 - [x] MILP solver (HiGHS via WebAssembly)
 - [x] PV productie integratie (0-10 kWp profielen)
 - [x] Eigen verbruik profielen (basis, WP, EV, WP+EV)

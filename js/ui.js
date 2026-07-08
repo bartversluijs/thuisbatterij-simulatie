@@ -74,6 +74,8 @@ async function handleFormSubmit(event) {
     const minSoc = parseFloat(document.getElementById('minSoc').value.replace(',', '.')) / 100;
     const maxSoc = parseFloat(document.getElementById('maxSoc').value.replace(',', '.')) / 100;
     const initialSoc = parseFloat(document.getElementById('initialSoc').value.replace(',', '.')) / 100;
+    const fixedConsumptionEl = document.getElementById('fixedConsumption');
+    const fixedConsumptionW = fixedConsumptionEl ? (parseFloat(fixedConsumptionEl.value.replace(',', '.')) || 0) : 0;  // Watts, Phase 1
 
     const priceMode = document.querySelector('input[name="priceMode"]:checked').value;
 
@@ -99,7 +101,8 @@ async function handleFormSubmit(event) {
             chargeEfficiency: chargeEff,
             dischargeEfficiency: dischargeEff,
             minSocPct: minSoc,
-            maxSocPct: maxSoc
+            maxSocPct: maxSoc,
+            fixedConsumptionW: fixedConsumptionW
         };
 
         let priceConfig;
@@ -181,6 +184,13 @@ async function handleFormSubmit(event) {
         const monthlySummary = simulator.getMonthlySummary(results);
         const totals = simulator.getTotals(monthlySummary);
 
+        // Standby (fixed inverter) consumption over the run, annualized by data span (Phase 1)
+        totals.totalFixedConsumption = simulator.totalFixedConsumption || 0;
+        if (results.length > 1) {
+            const spanMs = new Date(results[results.length - 1].timestamp) - new Date(results[0].timestamp);
+            totals.fixedConsumptionYears = spanMs / (365.25 * 24 * 3600 * 1000);
+        }
+
         // Store results
         currentResults = results;
         currentMonthlySummary = monthlySummary;
@@ -251,6 +261,22 @@ function displayResults(totals, monthlySummary) {
     document.getElementById('totalProfit').textContent = `€${totals.totalProfit.toFixed(2)}`;
     document.getElementById('totalCycles').textContent = totals.totalCycles.toFixed(1);
     document.getElementById('avgProfitPerCycle').textContent = `€${totals.avgProfitPerCycle.toFixed(2)}`;
+
+    // Standby (fixed inverter) consumption — only shown when the feature is enabled
+    const standbyCard = document.getElementById('standbyCard');
+    if (standbyCard) {
+        const standbyKwh = totals.totalFixedConsumption || 0;
+        if (standbyKwh > 0) {
+            document.getElementById('standbyConsumption').textContent = standbyKwh.toFixed(0) + ' kWh';
+            document.getElementById('standbyConsumptionComparison').textContent =
+                totals.fixedConsumptionYears > 0
+                    ? `≈ ${(standbyKwh / totals.fixedConsumptionYears).toFixed(0)} kWh/jaar`
+                    : '';
+            standbyCard.style.display = '';
+        } else {
+            standbyCard.style.display = 'none';
+        }
+    }
 
     // Update table
     const tableBody = document.getElementById('monthlyTableBody');
@@ -496,7 +522,8 @@ function loadParametersFromUrl() {
     // Load all form fields from URL
     const fields = [
         'year', 'capacity', 'chargePower', 'dischargePower',
-        'chargeEff', 'dischargeEff', 'minSoc', 'maxSoc', 'initialSoc'
+        'chargeEff', 'dischargeEff', 'minSoc', 'maxSoc', 'initialSoc',
+        'fixedConsumption'
     ];
 
     fields.forEach(field => {
@@ -549,6 +576,8 @@ function updateUrlWithParameters() {
     params.set('minSoc', document.getElementById('minSoc').value);
     params.set('maxSoc', document.getElementById('maxSoc').value);
     params.set('initialSoc', document.getElementById('initialSoc').value);
+    const fixedConsumptionEl = document.getElementById('fixedConsumption');
+    if (fixedConsumptionEl) params.set('fixedConsumption', fixedConsumptionEl.value);
 
     // Add price mode
     const priceMode = document.querySelector('input[name="priceMode"]:checked').value;

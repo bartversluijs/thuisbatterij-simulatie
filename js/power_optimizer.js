@@ -8,12 +8,14 @@ class PowerOptimizer {
      * @param {Object} priceConfig - Price configuration {buyFormula, sellFormula}
      * @param {Array} pricesData - Historical price data
      * @param {Object} efficiencyCurve - Efficiency curve preset
+     * @param {number} [fixedConsumptionW] - Fixed inverter/system consumption in Watts (Phase 1). Default 0.
      */
-    constructor(capacityKwh, priceConfig, pricesData, efficiencyCurve) {
+    constructor(capacityKwh, priceConfig, pricesData, efficiencyCurve, fixedConsumptionW = 0) {
         this.capacityKwh = capacityKwh;
         this.priceConfig = priceConfig;
         this.pricesData = pricesData;
         this.efficiencyCurve = efficiencyCurve;
+        this.fixedConsumptionW = fixedConsumptionW || 0;
     }
 
     /**
@@ -207,7 +209,8 @@ class PowerOptimizer {
             chargeEfficiency: eff.chargeTotal,
             dischargeEfficiency: eff.dischargeTotal,
             minSocPct: options.minSocPct / 100,
-            maxSocPct: options.maxSocPct / 100
+            maxSocPct: options.maxSocPct / 100,
+            fixedConsumptionW: this.fixedConsumptionW
         };
 
         // Run full year simulation

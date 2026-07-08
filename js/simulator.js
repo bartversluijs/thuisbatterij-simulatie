@@ -27,6 +27,7 @@ class BatterySimulator {
     async simulate(progressCallback = null) {
         this.history = [];
         this.currentPlan = null;
+        this.totalFixedConsumption = 0;  // kWh of inverter standby draw over the run (Phase 1)
 
         // Convert prices to Map for fast lookup (index-based to handle DST duplicates)
         const pricesMap = new Map();
@@ -179,6 +180,15 @@ class BatterySimulator {
                     }
                 }
             }
+
+            // Fixed inverter/system parasitic consumption (Phase 1): a continuous
+            // idle drain regardless of trading. Drawn from the battery while
+            // SoC > Min SoC; the shortfall is imported from the grid at the buy price.
+            const fixed = this.battery.applyFixedConsumption(durationHours);
+            if (fixed.fromGrid > 0) {
+                profit -= fixed.fromGrid * buyPrice;
+            }
+            this.totalFixedConsumption += fixed.totalKwh;
 
             // Record state
             this.history.push({

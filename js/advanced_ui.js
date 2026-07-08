@@ -107,6 +107,8 @@ async function handleSweepSubmit(e) {
     const maxSoc = parseFloat(formData.get('maxSoc'));
     const initialSoc = parseFloat(formData.get('initialSoc'));
 
+    const fixedConsumptionW = parseFloat(formData.get('fixedConsumption')) || 0;  // Watts, Phase 1
+
     const chargeMin = parseFloat(formData.get('chargePowerMin'));
     const chargeMax = parseFloat(formData.get('chargePowerMax'));
     const chargeStep = parseFloat(formData.get('chargePowerStep'));
@@ -171,7 +173,8 @@ async function handleSweepSubmit(e) {
             capacity,
             priceConfig,
             pricesData,
-            efficiencyCurve
+            efficiencyCurve,
+            fixedConsumptionW
         );
 
         // Run sweep
@@ -353,6 +356,7 @@ async function handleOptimizeSubmit(e) {
     const initialChargePower = parseFloat(formData.get('initialChargePower'));
     const initialDischargePower = parseFloat(formData.get('initialDischargePower'));
     const tolerance = parseFloat(formData.get('tolerance'));
+    const fixedConsumptionW = parseFloat(formData.get('fixedConsumption')) || 0;  // Watts, Phase 1
 
     const priceMode = formData.get('priceMode');
 
@@ -383,7 +387,8 @@ async function handleOptimizeSubmit(e) {
             capacity,
             priceConfig,
             pricesData,
-            efficiencyCurve
+            efficiencyCurve,
+            fixedConsumptionW
         );
 
         // Run optimization

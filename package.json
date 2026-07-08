@@ -7,7 +7,7 @@
     "lib": "lib"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node tests/phase1_fixed_consumption.test.js"
   },
   "keywords": [],
   "author": "",

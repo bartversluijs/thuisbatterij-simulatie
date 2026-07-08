@@ -155,6 +155,7 @@ class SolarSimulator {
         let totalGridExport = 0;
         let totalBatteryCharge = 0;
         let totalBatteryDischarge = 0;
+        let totalFixedConsumption = 0;  // kWh inverter standby draw (Phase 1)
 
         const mergedData = this.mergeData();
         let currentPlan = null;
@@ -276,10 +277,23 @@ class SolarSimulator {
             sinkConsumption -= batteryToConsumption;
 
             // Remaining sinks need grid import
-            const gridImport = sinkConsumption + sinkBattery;
+            let gridImport = sinkConsumption + sinkBattery;
 
             // Remaining sources go to grid export
-            const gridExport = availableSolar + availableBattery;
+            let gridExport = availableSolar + availableBattery;
+
+            // Fixed inverter/system parasitic consumption (Phase 1): drawn from the
+            // battery while SoC > Min SoC; the shortfall reduces export first, then
+            // adds grid import.
+            const fixed = battery.applyFixedConsumption(1.0);
+            totalFixedConsumption += fixed.totalKwh;
+            let fixedShortfall = fixed.fromGrid;
+            if (fixedShortfall > 0) {
+                const reduceExport = Math.min(fixedShortfall, gridExport);
+                gridExport -= reduceExport;
+                fixedShortfall -= reduceExport;
+                gridImport += fixedShortfall;
+            }
 
             // Calculate cost
             let cost = 0;
@@ -347,6 +361,7 @@ class SolarSimulator {
             totalGridExport: totalGridExport,
             totalBatteryCharge: totalBatteryCharge,
             totalBatteryDischarge: totalBatteryDischarge,
+            totalFixedConsumption: totalFixedConsumption,
             cycles: cycles,
             selfConsumptionPct: selfConsumptionPct,
             selfSufficiencyPct: selfSufficiencyPct
@@ -447,6 +462,7 @@ class SolarSimulator {
         let totalGridExport = 0;
         let totalBatteryCharge = 0;
         let totalBatteryDischarge = 0;
+        let totalFixedConsumption = 0;  // kWh inverter standby draw (Phase 1)
 
         const mergedData = this.mergeData();
 
@@ -492,8 +508,21 @@ class SolarSimulator {
             }
 
             // Grid import/export for what remains
-            const gridImport = remainingConsumption;
-            const gridExport = remainingSolar;
+            let gridImport = remainingConsumption;
+            let gridExport = remainingSolar;
+
+            // Fixed inverter/system parasitic consumption (Phase 1): drawn from the
+            // battery while SoC > Min SoC; the shortfall reduces export first, then
+            // adds grid import.
+            const fixed = battery.applyFixedConsumption(1.0);
+            totalFixedConsumption += fixed.totalKwh;
+            let fixedShortfall = fixed.fromGrid;
+            if (fixedShortfall > 0) {
+                const reduceExport = Math.min(fixedShortfall, gridExport);
+                gridExport -= reduceExport;
+                fixedShortfall -= reduceExport;
+                gridImport += fixedShortfall;
+            }
 
             // Calculate cost
             let cost = 0;
@@ -553,6 +582,7 @@ class SolarSimulator {
             totalGridExport: totalGridExport,
             totalBatteryCharge: totalBatteryCharge,
             totalBatteryDischarge: totalBatteryDischarge,
+            totalFixedConsumption: totalFixedConsumption,
             cycles: cycles,
             selfConsumptionPct: selfConsumptionPct,
             selfSufficiencyPct: selfSufficiencyPct
