@@ -13,6 +13,20 @@ function _resolvePartLoadFn() {
 }
 
 /**
+ * Resolve the Phase-6c reserve-floor helper (browser global or Node require).
+ * Falls back to Min SoC when the module is unavailable, so the reserve is a
+ * strict no-op if backup_reserve.js was not loaded.
+ * @returns {Function}
+ */
+function _resolveReserveFloorFn() {
+    if (typeof reserveFloorPct !== 'undefined') return reserveFloorPct; // browser global
+    if (typeof require !== 'undefined') {
+        try { return require('./backup_reserve.js').reserveFloorPct; } catch (e) { /* optional */ }
+    }
+    return (reserve, min) => (reserve == null || Number.isNaN(reserve)) ? min : Math.max(min, reserve);
+}
+
+/**
  * Battery class - simulates battery charge/discharge with efficiency
  * Direct port from Python implementation
  */
@@ -28,6 +42,8 @@ class Battery {
      * @param {number} config.maxSocPct - Maximum SoC percentage (0-1)
      * @param {number} [config.fixedConsumptionW] - Fixed inverter/system consumption in Watts (Phase 1). Default 0 (no-op).
      * @param {Object} [config.partLoad] - Part-load efficiency curve (Phase 3). Default null/disabled (no-op).
+     * @param {number} [config.backupReserveSocPct] - Backup reserve floor (0-1) held for outages, unavailable to
+     *   arbitrage/discharge (Phase 6c). Defaults to (and is clamped up to) minSocPct → no reserve (no-op).
      * @param {number} initialSocPct - Initial State of Charge (0-1)
      */
     constructor(config, initialSocPct = 0.5) {
@@ -37,6 +53,9 @@ class Battery {
         this.fixedConsumptionW = config.fixedConsumptionW || 0;
         // Part-load efficiency curve (Phase 3). Null/disabled → flat efficiency (backward compatible).
         this.partLoad = config.partLoad || null;
+        // Backup reserve floor for arbitrage/discharge (Phase 6c), clamped to ≥ Min SoC.
+        // Defaults to Min SoC when unset, reproducing pre-Phase-6c behavior exactly.
+        this.backupReserveSocPct = _resolveReserveFloorFn()(config.backupReserveSocPct, config.minSocPct);
     }
 
     /**
@@ -106,9 +125,11 @@ class Battery {
         // Maximum power limit (DC)
         const maxDcPowerKwh = this.config.dischargePowerKw * durationHours;
 
-        // Minimum SoC limit
-        const minSocKwh = this.config.capacityKwh * this.config.minSocPct;
-        const availableEnergy = this.socKwh - minSocKwh;
+        // Discharge floor (Phase 6c): arbitrage/self-consumption may not dip into
+        // the backup reserve. This equals Min SoC when no reserve is configured,
+        // so behavior is unchanged for existing configs.
+        const floorSocKwh = this.config.capacityKwh * this.backupReserveSocPct;
+        const availableEnergy = this.socKwh - floorSocKwh;
 
         // Actual DC energy from battery (limited by power, available energy, and requested energy)
         const dcFromBattery = Math.min(energyKwh, maxDcPowerKwh, availableEnergy);
@@ -150,7 +171,10 @@ class Battery {
             return { fromBattery: 0, fromGrid: 0, totalKwh: 0 };
         }
 
-        // Energy available above the Min SoC floor
+        // Energy available above the Min SoC floor. This deliberately uses the
+        // absolute hardware floor (Min SoC), NOT the Phase-6c backup reserve: the
+        // idle inverter drain is exactly the kind of load the reserve exists to
+        // cover during an outage, so it may draw the reserve down to Min SoC.
         const minSocKwh = this.config.capacityKwh * this.config.minSocPct;
         const availableEnergy = Math.max(0, this.socKwh - minSocKwh);
 

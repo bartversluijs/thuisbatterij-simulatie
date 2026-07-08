@@ -310,6 +310,43 @@ de per-cyclus degradatie van Fase 4.
 - **Beschikbaar op:** arbitrage (index.html), PV + verbruik (with_solar.html) en
   Eigen Data (custom_data.html).
 
+**Noodreserve SoC (`backup_reserve_soc`, %)** — *Fase 6c*
+
+Een aparte **noodreserve** die apart staat van de veiligheids-`Min SoC`.
+`Min SoC` is de absolute hardware-ondergrens die nooit wordt onderschreden — maar
+een batterij die op `Min SoC` staat heeft niets meer over om het huis te voeden
+bij een stroomstoring. De noodreserve reserveert daarvoor een hogere buffer:
+
+    Min SoC  ≤  Noodreserve SoC  ≤  Max SoC
+    └ absolute       └ handels-/ontlaadondergrens: energie hieronder wordt
+      hardware         achtergehouden voor stroomuitval en is níet beschikbaar
+      ondergrens       voor arbitrage of zelfconsumptie.
+
+- **Model:** handel en zelfconsumptie mogen alleen de band `[Noodreserve, Max SoC]`
+  gebruiken; zowel de MILP-optimizer als de ontlaadstap hanteren deze ondergrens.
+  Het **sluimerverbruik** (Fase 1) mag wél tot `Min SoC` teren — dat is precies
+  het soort verbruik dat de reserve tijdens een storing moet dekken.
+- **Kosten:** een hogere reserve levert minder handelsopbrengst op, omdat de
+  bruikbare cyclusdiepte kleiner wordt. Voorbeeld (10 kWh / 5 kW, 2024, Tibber
+  standaard mét salderen; jaarwinst zonder reserve ≈ €381):
+
+  | Noodreserve | Bruikbare band | Jaarwinst | vs. geen reserve |
+  |-------------|----------------|-----------|------------------|
+  | geen (10%)  | 10–100%        | €381      | —                |
+  | 20%         | 20–100%        | €344      | −€37 (−9,8%)     |
+  | 30%         | 30–100%        | €307      | −€75 (−19,6%)    |
+  | 50%         | 50–100%        | €232      | −€149 (−39,2%)   |
+
+  Vuistregel: elke ~10%-punt extra reserve kost hier ruwweg €35–40/jaar aan
+  gemiste arbitrage. Het exacte bedrag hangt af van capaciteit, tarief en jaar —
+  vul je eigen waarden in en vergelijk de jaarwinst met en zonder reserve.
+- **Velden ("Geavanceerd (verliezen)", veld "Noodreserve SoC"):** één percentage;
+  moet ≥ `Min SoC` en < `Max SoC` zijn (anders een duidelijke foutmelding).
+- **Standaard:** leeg of gelijk aan `Min SoC` → geen reserve; bestaande
+  configuraties en gedeelde URLs blijven identiek.
+- **Beschikbaar op:** arbitrage (index.html), PV + verbruik (with_solar.html) en
+  Eigen Data (custom_data.html), inclusief de vermogensscan op de Eigen Data-pagina.
+
 Zie `PLAN.md` voor de bredere roadmap van modelleringsverbeteringen.
 
 ### Implementatie Status
@@ -319,6 +356,7 @@ Zie `PLAN.md` voor de bredere roadmap van modelleringsverbeteringen.
 - [x] Deellast-rendement omvormer (Fase 3, handmatige-invoer pagina's)
 - [x] Capaciteitsdegradatie over levensduur (Fase 4, handmatige-invoer pagina's)
 - [x] Doorzet & volledige cycli (EFC) als uitvoer (Fase 5, alle pagina's)
+- [x] Noodreserve SoC apart van Min SoC (Fase 6c, handmatige-invoer pagina's)
 - [x] MILP solver (HiGHS via WebAssembly)
 - [x] PV productie integratie (0-10 kWp profielen)
 - [x] Eigen verbruik profielen (basis, WP, EV, WP+EV)

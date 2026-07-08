@@ -13,6 +13,26 @@ let highsInstance = null;
 let highsLoading = null;
 
 /**
+ * Phase-6c lower SoC bound for the optimizer: the backup reserve, clamped up to
+ * Min SoC. Uses the shared backup_reserve helper (browser global or Node
+ * require) and falls back to a local clamp if the module is unavailable, so a
+ * missing reserve is a strict no-op (equals Min SoC).
+ * @param {Object} batteryConfig
+ * @returns {number} Reserve floor as a fraction (0-1).
+ */
+function _optimizerReserveFloorPct(batteryConfig) {
+    const min = batteryConfig.minSocPct;
+    const reserve = batteryConfig.backupReserveSocPct;
+    let fn = null;
+    if (typeof reserveFloorPct !== 'undefined') fn = reserveFloorPct; // browser global
+    else if (typeof require !== 'undefined') {
+        try { fn = require('./backup_reserve.js').reserveFloorPct; } catch (e) { /* optional */ }
+    }
+    if (fn) return fn(reserve, min);
+    return (reserve == null || Number.isNaN(reserve)) ? min : Math.max(min, reserve);
+}
+
+/**
  * Load HiGHS solver (call once at startup)
  * Uses the global Module function provided by highs.js script tag
  */
@@ -84,7 +104,10 @@ class BatteryOptimizer {
 
         // Battery constraints
         const capacity = this.batteryConfig.capacityKwh;
-        const minSoc = capacity * this.batteryConfig.minSocPct;
+        // Lower SoC bound for trading = the Phase-6c backup reserve (energy below
+        // it is held for outages). Defaults to / is clamped up to Min SoC, so
+        // without a reserve this is exactly the hardware floor (unchanged).
+        const minSoc = capacity * _optimizerReserveFloorPct(this.batteryConfig);
         const maxSoc = capacity * this.batteryConfig.maxSocPct;
         const maxChargePower = this.batteryConfig.chargePowerKw * durationHours;
         const maxDischargePower = this.batteryConfig.dischargePowerKw * durationHours;
@@ -247,7 +270,8 @@ class BatteryOptimizer {
 
         // Battery constraints
         const capacity = this.batteryConfig.capacityKwh;
-        const minSoc = capacity * this.batteryConfig.minSocPct;
+        // Lower SoC bound for trading = the Phase-6c backup reserve (see optimize()).
+        const minSoc = capacity * _optimizerReserveFloorPct(this.batteryConfig);
         const maxSoc = capacity * this.batteryConfig.maxSocPct;
         const maxChargePower = this.batteryConfig.chargePowerKw * durationHours;
         const maxDischargePower = this.batteryConfig.dischargePowerKw * durationHours;

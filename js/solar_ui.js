@@ -109,6 +109,12 @@ async function handleFormSubmit(e) {
     // Phase 4: capacity degradation → representative usable capacity (none → unchanged).
     const degradation = readDegradationConfig();
     const effectiveCapacity = effectiveCapacityKwh(capacity, degradation);
+    // Phase 6c: backup reserve SoC (fraction). null → no reserve (== Min SoC).
+    const backupReserveSoc = readBackupReserveSocPct();
+    if (backupReserveSoc !== null && (backupReserveSoc < minSoc / 100 || backupReserveSoc >= maxSoc / 100)) {
+        alert('Noodreserve SoC moet ≥ Min SoC en < Max SoC zijn');
+        return;
+    }
     const priceMode = formData.get('priceMode');
     const fixedBuyPrice = parseFloat(formData.get('fixedBuyPrice'));
     const fixedSellPrice = parseFloat(formData.get('fixedSellPrice'));
@@ -144,7 +150,8 @@ async function handleFormSubmit(e) {
             minSocPct: minSoc / 100,
             maxSocPct: maxSoc / 100,
             fixedConsumptionW: fixedConsumptionW,
-            partLoad: partLoad
+            partLoad: partLoad,
+            backupReserveSocPct: backupReserveSoc  // Phase 6c; null → no reserve (no-op)
         };
 
         const priceConfig = buildPriceConfig(priceMode, formData);
@@ -1510,7 +1517,8 @@ function loadParametersFromUrl() {
         'chargeEff', 'dischargeEff', 'minSoc', 'maxSoc',
         'fixedBuyPrice', 'fixedSellPrice',
         'batteryChargeEff', 'batteryDischargeEff', 'inverterChargeEff', 'inverterDischargeEff',
-        'lowPowerEff', 'lowPowerThresholdKw'
+        'lowPowerEff', 'lowPowerThresholdKw',
+        'backupReserveSoc'
     ];
 
     fields.forEach(field => {
@@ -1637,6 +1645,12 @@ function updateUrlWithParameters() {
         }
         params.set('degradationFloor', document.getElementById('degradationFloor').value);
         params.set('degradationHorizon', document.getElementById('degradationHorizon').value);
+    }
+
+    // Backup reserve SoC (Phase 6c) — only persist when set.
+    const backupReserveEl = document.getElementById('backupReserveSoc');
+    if (backupReserveEl && backupReserveEl.value.trim() !== '') {
+        params.set('backupReserveSoc', backupReserveEl.value);
     }
 
     // Add price mode

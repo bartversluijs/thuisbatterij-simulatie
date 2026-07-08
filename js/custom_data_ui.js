@@ -250,6 +250,12 @@ async function handleFormSubmit(e) {
     // Phase 4: capacity degradation → representative usable capacity (none → unchanged).
     const degradation = readDegradationConfig();
     const effectiveCapacity = effectiveCapacityKwh(capacity, degradation);
+    // Phase 6c: backup reserve SoC (fraction). null → no reserve (== Min SoC).
+    const backupReserveSoc = readBackupReserveSocPct();
+    if (backupReserveSoc !== null && (backupReserveSoc < minSoc / 100 || backupReserveSoc >= maxSoc / 100)) {
+        alert('Noodreserve SoC moet ≥ Min SoC en < Max SoC zijn');
+        return;
+    }
     const priceMode = formData.get('priceMode');
 
     // Disable form
@@ -330,7 +336,8 @@ async function handleFormSubmit(e) {
             maxSocPct: maxSoc / 100,
             initialSocPct: initialSoc / 100,
             fixedConsumptionW: fixedConsumptionW,
-            partLoad: partLoad
+            partLoad: partLoad,
+            backupReserveSocPct: backupReserveSoc  // Phase 6c; null → no reserve (no-op)
         };
 
         const priceConfig = buildPriceConfig(priceMode, formData);
@@ -420,6 +427,12 @@ async function handleCapacityScan(form, formData) {
     const partLoad = readPartLoadConfig();
     // Phase 4: capacity degradation, applied to every scanned (nominal) capacity below.
     const degradation = readDegradationConfig();
+    // Phase 6c: backup reserve SoC (fraction), applied to every scanned capacity.
+    const backupReserveSoc = readBackupReserveSocPct();
+    if (backupReserveSoc !== null && (backupReserveSoc < minSoc / 100 || backupReserveSoc >= maxSoc / 100)) {
+        alert('Noodreserve SoC moet ≥ Min SoC en < Max SoC zijn');
+        return;
+    }
     const priceMode = formData.get('priceMode');
 
     const capacities = [2, 4, 8, 16, 32, 64];
@@ -493,7 +506,8 @@ async function handleCapacityScan(form, formData) {
                 maxSocPct: maxSoc / 100,
                 initialSocPct: initialSoc / 100,
                 fixedConsumptionW: fixedConsumptionW,
-                partLoad: partLoad
+                partLoad: partLoad,
+                backupReserveSocPct: backupReserveSoc  // Phase 6c; null → no reserve (no-op)
             };
 
             const simulator = new CustomDataSimulator(

@@ -98,12 +98,25 @@ async function handleFormSubmit(event) {
     const degradation = readDegradationConfig();
     const effectiveCapacity = effectiveCapacityKwh(capacity, degradation);
 
+    // Phase 6c: backup reserve SoC (fraction). null → no reserve (== Min SoC).
+    const backupReserveSoc = readBackupReserveSocPct();
+
     const priceMode = document.querySelector('input[name="priceMode"]:checked').value;
 
     // Validate
     if (minSoc >= maxSoc) {
         alert('Min SoC moet kleiner zijn dan Max SoC');
         return;
+    }
+    if (backupReserveSoc !== null) {
+        if (backupReserveSoc < minSoc) {
+            alert('Noodreserve SoC moet ≥ Min SoC zijn');
+            return;
+        }
+        if (backupReserveSoc >= maxSoc) {
+            alert('Noodreserve SoC moet < Max SoC zijn');
+            return;
+        }
     }
 
     // Show progress
@@ -124,7 +137,8 @@ async function handleFormSubmit(event) {
             minSocPct: minSoc,
             maxSocPct: maxSoc,
             fixedConsumptionW: fixedConsumptionW,
-            partLoad: partLoad
+            partLoad: partLoad,
+            backupReserveSocPct: backupReserveSoc  // Phase 6c; null → no reserve (no-op)
         };
 
         let priceConfig;
@@ -588,7 +602,8 @@ function loadParametersFromUrl() {
         'chargeEff', 'dischargeEff', 'minSoc', 'maxSoc', 'initialSoc',
         'fixedConsumption',
         'batteryChargeEff', 'batteryDischargeEff', 'inverterChargeEff', 'inverterDischargeEff',
-        'lowPowerEff', 'lowPowerThresholdKw'
+        'lowPowerEff', 'lowPowerThresholdKw',
+        'backupReserveSoc'
     ];
 
     fields.forEach(field => {
@@ -714,6 +729,12 @@ function updateUrlWithParameters() {
         }
         params.set('degradationFloor', document.getElementById('degradationFloor').value);
         params.set('degradationHorizon', document.getElementById('degradationHorizon').value);
+    }
+
+    // Backup reserve SoC (Phase 6c) — only persist when set, to keep shared URLs clean.
+    const backupReserveEl = document.getElementById('backupReserveSoc');
+    if (backupReserveEl && backupReserveEl.value.trim() !== '') {
+        params.set('backupReserveSoc', backupReserveEl.value);
     }
 
     // Add price mode
