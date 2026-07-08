@@ -220,12 +220,43 @@ omvormers of LV/HV-systemen).
   De geavanceerde analyse (advanced.html) gebruikt vermogensafhankelijke curves
   en heeft deze splitsing niet.
 
+**Deellast-rendement omvormer** — *Fase 3*
+
+Een omvormer is niet even efficiënt bij elk vermogen: bij laag vermogen (enkele
+honderden watt) zakt het rendement duidelijk t.o.v. bijna-nominale belasting.
+Avond-basislasten worden vaak bij laag vermogen bediend — precies waar het
+rendement het slechtst is — dus een enkel vlak rendementsgetal *overschat* de
+werkelijke opbrengst bij laag-vermogen laden/ontladen systematisch.
+
+- **Velden ("Geavanceerd (verliezen)", vinkje "Deellast-rendement omvormer"):**
+  - `low_power_eff` — Rendement bij laag vermogen (%), toegepast onder de drempel.
+  - `low_power_threshold_kw` — Drempelvermogen (kW); erboven geldt het nominale
+    (vlakke) rendement uit de velden Laad-/Ontlaadefficiëntie.
+  - *Lineair interpoleren* (aan als standaard): laat het rendement lineair
+    oplopen van `low_power_eff` (bij 0 kW) naar nominaal (bij de drempel), zodat
+    er geen sprong op de grens ontstaat. Uit = harde stap onder de drempel.
+- **Eenheid:** rendement in procenten (%), drempel in kW (DC-vermogen).
+- **Effect op het model:** per tijdstap wordt het momentane DC-vermogen berekend
+  (energie / tijdstap `dt`) en daarmee het toe te passen rendement bepaald, in
+  plaats van een vast getal. Het is een *penalty*-model: het rendement kan nooit
+  boven nominaal uitkomen, alleen eronder. `dt` wordt uit de data afgeleid.
+- **Standaard:** vinkje uit → geen effect; bestaande configuraties en gedeelde
+  URLs blijven identiek.
+- **Interactie met dispatch:** grotere, minder frequente blokken (zoals een
+  externe energiemanager als EVCC kan afdwingen) houden de omvormer uit het
+  laag-rendementsgebied. Dit verklaart waarom slim schakelen de werkelijke
+  opbrengst verhoogt boven pure arbitrage.
+- **Beschikbaar op:** arbitrage (index.html), PV + verbruik (with_solar.html) en
+  Eigen Data (custom_data.html). De geavanceerde analyse (advanced.html) gebruikt
+  al vermogensafhankelijke curves (Victron) en heeft deze optie niet nodig.
+
 Zie `PLAN.md` voor de bredere roadmap van modelleringsverbeteringen.
 
 ### Implementatie Status
 
 - [x] Vast verbruik omvormer / parasitair verlies (Fase 1, alle pagina's)
 - [x] Rendement splitsen in batterij × omvormer (Fase 2, handmatige-invoer pagina's)
+- [x] Deellast-rendement omvormer (Fase 3, handmatige-invoer pagina's)
 - [x] MILP solver (HiGHS via WebAssembly)
 - [x] PV productie integratie (0-10 kWp profielen)
 - [x] Eigen verbruik profielen (basis, WP, EV, WP+EV)

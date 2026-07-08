@@ -7,7 +7,7 @@
     "lib": "lib"
   },
   "scripts": {
-    "test": "node tests/phase1_fixed_consumption.test.js && node tests/phase2_efficiency_split.test.js"
+    "test": "node tests/phase1_fixed_consumption.test.js && node tests/phase2_efficiency_split.test.js && node tests/phase3_part_load.test.js"
   },
   "keywords": [],
   "author": "",

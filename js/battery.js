@@ -1,4 +1,18 @@
 /**
+ * Resolve the Phase-3 part-load efficiency function, whether running in the
+ * browser (loaded as a global before this script) or in Node (required).
+ * Resolved lazily so browser script order does not matter.
+ * @returns {Function|null}
+ */
+function _resolvePartLoadFn() {
+    if (typeof partLoadEfficiency !== 'undefined') return partLoadEfficiency; // browser global
+    if (typeof require !== 'undefined') {
+        try { return require('./part_load_efficiency.js').partLoadEfficiency; } catch (e) { /* optional */ }
+    }
+    return null;
+}
+
+/**
  * Battery class - simulates battery charge/discharge with efficiency
  * Direct port from Python implementation
  */
@@ -13,6 +27,7 @@ class Battery {
      * @param {number} config.minSocPct - Minimum SoC percentage (0-1)
      * @param {number} config.maxSocPct - Maximum SoC percentage (0-1)
      * @param {number} [config.fixedConsumptionW] - Fixed inverter/system consumption in Watts (Phase 1). Default 0 (no-op).
+     * @param {Object} [config.partLoad] - Part-load efficiency curve (Phase 3). Default null/disabled (no-op).
      * @param {number} initialSocPct - Initial State of Charge (0-1)
      */
     constructor(config, initialSocPct = 0.5) {
@@ -20,6 +35,29 @@ class Battery {
         this.socKwh = config.capacityKwh * initialSocPct;
         // Fixed parasitic draw (Watts). Defaults to 0 so existing configs are unchanged.
         this.fixedConsumptionW = config.fixedConsumptionW || 0;
+        // Part-load efficiency curve (Phase 3). Null/disabled → flat efficiency (backward compatible).
+        this.partLoad = config.partLoad || null;
+    }
+
+    /**
+     * Effective per-direction efficiency for a single timestep (Phase 3).
+     *
+     * With the part-load curve disabled (default) this returns the nominal flat
+     * efficiency unchanged, so results are byte-identical to pre-Phase-3 runs.
+     * When enabled, the efficiency depends on the instantaneous DC power moved
+     * this timestep (energy / duration), penalising low-power operation.
+     *
+     * @param {number} nominalEff - Flat per-direction efficiency (fraction 0-1).
+     * @param {number} dcEnergyKwh - DC energy moved this timestep (kWh).
+     * @param {number} durationHours - Timestep duration in hours.
+     * @returns {number} Effective efficiency (fraction 0-1) for this timestep.
+     */
+    _effectiveEff(nominalEff, dcEnergyKwh, durationHours) {
+        if (!this.partLoad || !this.partLoad.enabled) return nominalEff;
+        const fn = _resolvePartLoadFn();
+        if (!fn) return nominalEff;
+        const powerKw = durationHours > 0 ? dcEnergyKwh / durationHours : 0;
+        return fn(nominalEff, powerKw, this.partLoad);
     }
 
     /**
@@ -47,8 +85,10 @@ class Battery {
         // Actual DC energy to battery (limited by power, capacity, and requested energy)
         const dcToBattery = Math.min(energyKwh, maxDcPowerKwh, availableCapacity);
 
-        // AC energy from grid = DC to battery / efficiency
-        const acFromGrid = dcToBattery / this.config.chargeEfficiency;
+        // AC energy from grid = DC to battery / efficiency.
+        // Phase 3: efficiency may depend on this timestep's instantaneous DC power.
+        const chargeEff = this._effectiveEff(this.config.chargeEfficiency, dcToBattery, durationHours);
+        const acFromGrid = dcToBattery / chargeEff;
 
         // Update SoC
         this.socKwh += dcToBattery;
@@ -73,8 +113,10 @@ class Battery {
         // Actual DC energy from battery (limited by power, available energy, and requested energy)
         const dcFromBattery = Math.min(energyKwh, maxDcPowerKwh, availableEnergy);
 
-        // AC energy to grid = DC from battery × efficiency
-        const acToGrid = dcFromBattery * this.config.dischargeEfficiency;
+        // AC energy to grid = DC from battery × efficiency.
+        // Phase 3: efficiency may depend on this timestep's instantaneous DC power.
+        const dischargeEff = this._effectiveEff(this.config.dischargeEfficiency, dcFromBattery, durationHours);
+        const acToGrid = dcFromBattery * dischargeEff;
 
         // Update SoC
         this.socKwh -= dcFromBattery;

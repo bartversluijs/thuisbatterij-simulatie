@@ -45,6 +45,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Phase 2: staged-efficiency toggle (show/hide the four stage fields).
     initEfficiencyStagedToggle();
 
+    // Phase 3: part-load efficiency toggle (show/hide the part-load fields).
+    initPartLoadToggle();
+
     // Negative price warning
     const fixedSellPriceInput = document.getElementById('fixedSellPrice');
     const negativePriceWarning = document.getElementById('negativePriceWarning');
@@ -98,6 +101,8 @@ async function handleFormSubmit(e) {
     const fixedConsumptionW = parseFloat(formData.get('fixedConsumption')) || 0;  // Watts, Phase 1
     // Phase 2: staged mode → effective efficiency = battery × inverter per direction (else passthrough).
     const eff = readStagedEfficiency(chargeEff, dischargeEff);
+    // Phase 3: part-load efficiency curve. Disabled → { enabled: false } (no-op).
+    const partLoad = readPartLoadConfig();
     const priceMode = formData.get('priceMode');
     const fixedBuyPrice = parseFloat(formData.get('fixedBuyPrice'));
     const fixedSellPrice = parseFloat(formData.get('fixedSellPrice'));
@@ -132,7 +137,8 @@ async function handleFormSubmit(e) {
             dischargeEfficiency: eff.dischargeEfficiency,
             minSocPct: minSoc / 100,
             maxSocPct: maxSoc / 100,
-            fixedConsumptionW: fixedConsumptionW
+            fixedConsumptionW: fixedConsumptionW,
+            partLoad: partLoad
         };
 
         const priceConfig = buildPriceConfig(priceMode, formData);
@@ -1472,7 +1478,8 @@ function loadParametersFromUrl() {
         'capacity', 'initialSoc', 'chargePower', 'dischargePower',
         'chargeEff', 'dischargeEff', 'minSoc', 'maxSoc',
         'fixedBuyPrice', 'fixedSellPrice',
-        'batteryChargeEff', 'batteryDischargeEff', 'inverterChargeEff', 'inverterDischargeEff'
+        'batteryChargeEff', 'batteryDischargeEff', 'inverterChargeEff', 'inverterDischargeEff',
+        'lowPowerEff', 'lowPowerThresholdKw'
     ];
 
     fields.forEach(field => {
@@ -1490,6 +1497,19 @@ function loadParametersFromUrl() {
         if (stagedEl) {
             stagedEl.checked = params.get('efficiencyStaged') === '1';
             stagedEl.dispatchEvent(new Event('change'));
+        }
+    }
+
+    // Part-load efficiency toggle (Phase 3) — checkboxes restored separately.
+    if (params.has('partLoadEnabled')) {
+        const plEl = document.getElementById('partLoadEnabled');
+        if (plEl) {
+            plEl.checked = params.get('partLoadEnabled') === '1';
+            plEl.dispatchEvent(new Event('change'));
+        }
+        const interpEl = document.getElementById('partLoadInterpolate');
+        if (interpEl && params.has('partLoadInterpolate')) {
+            interpEl.checked = params.get('partLoadInterpolate') === '1';
         }
     }
 
@@ -1546,6 +1566,16 @@ function updateUrlWithParameters() {
         params.set('batteryDischargeEff', document.getElementById('batteryDischargeEff').value);
         params.set('inverterChargeEff', document.getElementById('inverterChargeEff').value);
         params.set('inverterDischargeEff', document.getElementById('inverterDischargeEff').value);
+    }
+
+    // Part-load efficiency (Phase 3) — only persist when enabled.
+    const partLoadEl = document.getElementById('partLoadEnabled');
+    if (partLoadEl && partLoadEl.checked) {
+        params.set('partLoadEnabled', '1');
+        params.set('lowPowerEff', document.getElementById('lowPowerEff').value);
+        params.set('lowPowerThresholdKw', document.getElementById('lowPowerThresholdKw').value);
+        const interpEl = document.getElementById('partLoadInterpolate');
+        params.set('partLoadInterpolate', interpEl && interpEl.checked ? '1' : '0');
     }
 
     // Add price mode

@@ -28,6 +28,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Phase 2: staged-efficiency toggle (show/hide the four stage fields).
     initEfficiencyStagedToggle();
 
+    // Phase 3: part-load efficiency toggle (show/hide the part-load fields).
+    initPartLoadToggle();
+
     // Show/hide custom formula inputs
     const priceRadios = document.querySelectorAll('input[name="priceMode"]');
     const customInputs = document.getElementById('customFormulaInputs');
@@ -239,6 +242,8 @@ async function handleFormSubmit(e) {
     const minSoc = parseFloat(formData.get('minSoc'));
     const maxSoc = parseFloat(formData.get('maxSoc'));
     const fixedConsumptionW = parseFloat(formData.get('fixedConsumption')) || 0;  // Watts, Phase 1 (default 0 = no-op)
+    // Phase 3: part-load efficiency curve. Disabled → { enabled: false } (no-op).
+    const partLoad = readPartLoadConfig();
     const priceMode = formData.get('priceMode');
 
     // Disable form
@@ -318,7 +323,8 @@ async function handleFormSubmit(e) {
             minSocPct: minSoc / 100,
             maxSocPct: maxSoc / 100,
             initialSocPct: initialSoc / 100,
-            fixedConsumptionW: fixedConsumptionW
+            fixedConsumptionW: fixedConsumptionW,
+            partLoad: partLoad
         };
 
         const priceConfig = buildPriceConfig(priceMode, formData);
@@ -404,6 +410,8 @@ async function handleCapacityScan(form, formData) {
     const minSoc = parseFloat(formData.get('minSoc'));
     const maxSoc = parseFloat(formData.get('maxSoc'));
     const fixedConsumptionW = parseFloat(formData.get('fixedConsumption')) || 0;  // Watts, Phase 1
+    // Phase 3: part-load efficiency curve, applied to the baseline and every capacity in the scan.
+    const partLoad = readPartLoadConfig();
     const priceMode = formData.get('priceMode');
 
     const capacities = [2, 4, 8, 16, 32, 64];
@@ -450,7 +458,7 @@ async function handleCapacityScan(form, formData) {
             { capacityKwh: 2, chargePowerKw: 0.5, dischargePowerKw: 0.5,
               chargeEfficiency: chargeEff, dischargeEfficiency: dischargeEff,
               minSocPct: minSoc / 100, maxSocPct: maxSoc / 100, initialSocPct: initialSoc / 100,
-              fixedConsumptionW: fixedConsumptionW },
+              fixedConsumptionW: fixedConsumptionW, partLoad: partLoad },
             priceConfig, fixedPriceConfig, trimmedData.data, pricesData, simulationInterval
         );
         const fixedNoBattery = await baselineSimulator.simulateFixedContract();
@@ -476,7 +484,8 @@ async function handleCapacityScan(form, formData) {
                 minSocPct: minSoc / 100,
                 maxSocPct: maxSoc / 100,
                 initialSocPct: initialSoc / 100,
-                fixedConsumptionW: fixedConsumptionW
+                fixedConsumptionW: fixedConsumptionW,
+                partLoad: partLoad
             };
 
             const simulator = new CustomDataSimulator(
